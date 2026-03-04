@@ -15,8 +15,7 @@ jobs:
       id-token: write
 
     env:
-      IMAGE: ${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ai-chat-api-repo/ai-chat-api:${{ github.sha }}
-      LATEST_IMAGE: ${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ai-chat-api-repo/ai-chat-api:latest
+      IMAGE: ${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ secrets.SERVICE_NAME }}:latest
 
     steps:
       - name: Checkout source
@@ -41,7 +40,6 @@ jobs:
       - name: Push Docker images to Artifact Registry
         run: |
           docker push $IMAGE
-          docker push $LATEST_IMAGE
 
       - name: Deploy to Cloud Run
         run: |
