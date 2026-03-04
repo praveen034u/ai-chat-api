@@ -36,12 +36,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build \
-            --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --cache-from $LATEST_IMAGE \
-            -t $IMAGE \
-            -t $LATEST_IMAGE \
-            .
+          docker build -t $IMAGE .
 
       - name: Push Docker images to Artifact Registry
         run: |
