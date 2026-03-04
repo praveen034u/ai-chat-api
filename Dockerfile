@@ -14,14 +14,18 @@ WORKDIR /app
 # Install system dependencies required for psycopg2 and other packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
+    make \
     libpq-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip and install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
@@ -33,9 +37,9 @@ USER appuser
 # Expose port (Cloud Run will use PORT env variable)
 EXPOSE 8080
 
-# Health check endpoint
+# Health check endpoint (simplified to avoid import issues during build)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8080/docs', timeout=5)"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/docs', timeout=5)"
 
 # Run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
