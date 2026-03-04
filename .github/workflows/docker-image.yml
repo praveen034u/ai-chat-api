@@ -57,7 +57,6 @@ jobs:
             --timeout 900s \
             --concurrency 80 \
             --set-env-vars "POSTGRES_URL=${{ secrets.POSTGRES_URL }},GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" \
-            --set-secrets "POSTGRES_URL=POSTGRES_URL:latest,GOOGLE_API_KEY=GOOGLE_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest" \
             --labels "app=ai-chat-api,env=production,managed-by=github-actions"
 
       - name: Output Cloud Run URL
