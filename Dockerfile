@@ -37,9 +37,9 @@ USER appuser
 # Expose port (Cloud Run will use PORT env variable)
 EXPOSE 8080
 
-# Health check endpoint (simplified to avoid import issues during build)
+# Health check endpoint (uses /health endpoint which doesn't require database)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/docs', timeout=5)"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=5)"
 
 # Run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]

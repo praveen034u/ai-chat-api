@@ -66,15 +66,29 @@ logging.info("Starting FastAPI app")
 
 app = FastAPI()
 
+# Initialize database connection lazily
 POSTGRES_URL = os.getenv("POSTGRES_URL")
-if not POSTGRES_URL:
-    raise ValueError("POSTGRES_URL environment variable is not set. Please check your .env file.")
+POSTGRES_URL_CLEAN = None
+engine = None
 
-# Remove pgbouncer parameter if present (not supported by psycopg2)
-# Supabase uses pgbouncer=true for connection pooling, which needs to be removed
-POSTGRES_URL_CLEAN = POSTGRES_URL.replace("?pgbouncer=true", "").replace("&pgbouncer=true", "").replace("?sslmode=require&pgbouncer=true", "?sslmode=require")
+def get_engine():
+    """Lazy initialize database engine"""
+    global engine, POSTGRES_URL_CLEAN
+    if engine is None:
+        if not POSTGRES_URL:
+            raise ValueError("POSTGRES_URL environment variable is not set. Please check your .env file.")
+        # Remove pgbouncer parameter if present (not supported by psycopg2)
+        # Supabase uses pgbouncer=true for connection pooling, which needs to be removed
+        POSTGRES_URL_CLEAN = POSTGRES_URL.replace("?pgbouncer=true", "").replace("&pgbouncer=true", "").replace("?sslmode=require&pgbouncer=true", "?sslmode=require")
+        engine = create_engine(POSTGRES_URL_CLEAN)
+        logging.info("Database engine initialized")
+    return engine
 
-engine = create_engine(POSTGRES_URL_CLEAN)
+# Add health check endpoint that doesn't require database
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Cloud Run"""
+    return {"status": "healthy", "service": "ai-chat-api"}
 
 SESSION_EXPIRY_MINUTES = 30
 
@@ -87,8 +101,14 @@ class PromptInput(BaseModel):
 def save_message_history(session_id: str, user_prompt: str, ai_response: str):
     """Background task to save message history to database"""
     try:
+        db_engine = get_engine()
+        # Get the cleaned connection string
+        cleaned_url = POSTGRES_URL
+        if cleaned_url:
+            cleaned_url = cleaned_url.replace("?pgbouncer=true", "").replace("&pgbouncer=true", "").replace("?sslmode=require&pgbouncer=true", "?sslmode=require")
+        
         chat_history = SQLChatMessageHistory(
-            connection_string=POSTGRES_URL_CLEAN,
+            connection_string=cleaned_url,
             session_id=session_id
         )
         chat_history.add_user_message(user_prompt)
@@ -191,7 +211,8 @@ async def generate(input_data: PromptInput, background_tasks: BackgroundTasks):
         logging.info(f"Using {len(rules)} rules for role: {role_value}")
         
         session_id = None
-        with engine.connect() as conn:
+        db_engine = get_engine()
+        with db_engine.connect() as conn:
             result = conn.execute(text("""
                 SELECT session_id, COUNT(*) AS message_count, MAX(created_at) AS last_activity
                 FROM message_store
@@ -213,8 +234,13 @@ async def generate(input_data: PromptInput, background_tasks: BackgroundTasks):
             session_id = f"{input_data.user_id}_{uuid.uuid4().hex[:8]}"
 
         # Initialize LangChain's SQLChatMessageHistory
+        db_engine = get_engine()
+        cleaned_url = POSTGRES_URL
+        if cleaned_url:
+            cleaned_url = cleaned_url.replace("?pgbouncer=true", "").replace("&pgbouncer=true", "").replace("?sslmode=require&pgbouncer=true", "?sslmode=require")
+        
         chat_history = SQLChatMessageHistory(
-            connection_string=POSTGRES_URL_CLEAN,
+            connection_string=cleaned_url,
             session_id=session_id
         )
         
@@ -282,7 +308,8 @@ async def generate(input_data: PromptInput, background_tasks: BackgroundTasks):
 @app.get("/history/{user_id}")
 async def get_chat_history(user_id: str):
     try:
-        with engine.connect() as conn:
+        db_engine = get_engine()
+        with db_engine.connect() as conn:
            result = conn.execute(text("""
            SELECT session_id,
            message::jsonb->>'type' AS role,
@@ -317,7 +344,8 @@ async def get_chat_history(user_id: str):
 @app.get("/sessions/{user_id}")
 async def get_user_sessions(user_id: str):
     try:
-        with engine.connect() as conn:
+        db_engine = get_engine()
+        with db_engine.connect() as conn:
             result = conn.execute(text("""
                 SELECT DISTINCT session_id, MAX(created_at) AS last_activity
                 FROM message_store
