@@ -20,9 +20,25 @@ load_dotenv()
 
 # Load LLM configuration from JSON
 def load_llm_config():
-    config_path = os.path.join(os.path.dirname(__file__), "llm_config.json")
-    with open(config_path, "r") as f:
-        return json.load(f)
+    try:
+        config_path = os.path.join(os.path.dirname(__file__), "llm_config.json")
+        with open(config_path, "r") as f:
+            config = json.load(f)
+            logging.info("LLM config loaded successfully")
+            return config
+    except Exception as e:
+        logging.error(f"Error loading LLM config: {str(e)}")
+        # Return a minimal default config if the file is missing
+        return {
+            "default_llm": "OPEN-API",
+            "history_limits": {
+                "max_history_messages": 20,
+                "max_history_tokens": 6000,
+                "max_history_age_days": 7
+            },
+            "llms": {},
+            "prompt_config": {}
+        }
 
 LLM_CONFIG = load_llm_config()
 
@@ -62,9 +78,20 @@ def get_llm_handler(provider: str, model_name: str, temperature: float, max_toke
 
 
 logging.basicConfig(level=logging.INFO)
-logging.info("Starting FastAPI app")
+logging.info("Starting FastAPI app initialization")
 
 app = FastAPI()
+
+# Startup event to verify basic initialization
+@app.on_event("startup")
+async def startup_event():
+    logging.info("FastAPI app startup event triggered")
+    try:
+        # Verify imports and basic config
+        logging.info(f"LLM Config loaded with {len(LLM_CONFIG.get('llms', {}))} providers")
+        logging.info("App startup completed successfully")
+    except Exception as e:
+        logging.error(f"Error during startup: {str(e)}")
 
 # Initialize database connection lazily
 POSTGRES_URL = os.getenv("POSTGRES_URL")
