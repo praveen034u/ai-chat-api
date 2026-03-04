@@ -41,6 +41,14 @@ jobs:
         run: |
           docker push $IMAGE
 
+      - name: Create env vars file
+        run: |
+          cat > env.yaml <<EOF
+          POSTGRES_URL: "${{ secrets.POSTGRES_URL }}"
+          GOOGLE_API_KEY: "${{ secrets.GOOGLE_API_KEY }}"
+          OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+          EOF
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ secrets.SERVICE_NAME }} \
@@ -49,15 +57,14 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --project ${{ secrets.GCP_PROJECT_ID }} \
-            --timeout=1200s \
+            --timeout=1800s \
             --memory 2Gi \
             --cpu 2 \
             --cpu-boost \
             --max-instances=10 \
             --min-instances=0 \
             --port=8080 \
-            --set-env-vars "POSTGRES_URL=${{ secrets.POSTGRES_URL }},GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" \
-            --labels "app=ai-chat-api,env=production,managed-by=github-actions"
+            --env-vars-file env.yaml
 
       - name: Output Cloud Run URL
         run: |
