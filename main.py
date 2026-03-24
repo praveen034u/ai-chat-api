@@ -14,6 +14,8 @@ import datetime
 import logging
 import json
 from dotenv import load_dotenv
+from app.routers.teacher_daily_content import router as teacher_daily_content_router
+from app.routers.student_daily_content import router as student_daily_content_router
 
 # Load environment variables from .env file
 load_dotenv()
